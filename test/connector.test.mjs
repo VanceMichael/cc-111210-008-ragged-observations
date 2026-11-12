@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {inspect,readHeader} from '../src/connector.mjs';import {startFixture} from '../fixtures/source.mjs';
+test('经典NetCDF维度读取与截断检查',()=>{assert.throws(()=>readHeader(Buffer.from('bad')),/CDF/);const bytes=Buffer.from('43444601000000000000000a00000001000000017800000000000002','hex');assert.equal(readHeader(bytes).dimensions[0].name,'x');});
+test('两种ragged布局均为实际CDF文件',async()=>{const source=await startFixture();try{for(const kind of ['contiguous','indexed','broken']){const result=await inspect(source.url,{kind});assert.deepEqual(result.dimensions.map(item=>item.size),[2,5]);assert.ok(result.bytes>300);}}finally{await source.close();}});
