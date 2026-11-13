@@ -32,3 +32,22 @@ test('服务健康检查和单次查看走真实来源', async () => {
     assert.equal((await fetch(service.url + '/missing')).status, 404);
   } finally { await service.close(); await fixture.close(); await rm(directory, { recursive: true, force: true }); }
 });
+
+test('采集接口输出逐观测记录并隔离损坏关系', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'service-'));
+  const fixture = await startFixture();
+  const service = await startService({ source: fixture.url, directory });
+  try {
+    const indexed = await (await fetch(service.url + '/collect?kind=indexed')).json();
+    assert.equal(indexed.complete, true);
+    assert.equal(indexed.observations.length, 5);
+    assert.equal(indexed.observations[0].temperature, 283.15);
+    const broken = await (await fetch(service.url + '/collect?kind=broken')).json();
+    assert.equal(broken.complete, false);
+    assert.deepEqual(broken.observations, []);
+    assert.equal(broken.errors[0].variable, 'rowSize');
+    const receipt = await (await fetch(service.url + '/receive?key=broken&kind=broken')).json();
+    assert.equal(receipt.value.complete, false);
+    assert.equal(receipt.value.errors[0].code, 'count-overflow');
+  } finally { await service.close(); await fixture.close(); await rm(directory, { recursive: true, force: true }); }
+});

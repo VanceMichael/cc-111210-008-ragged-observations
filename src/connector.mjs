@@ -1,4 +1,5 @@
 import { get } from './http.mjs';
+import { collectObservations } from './observations.mjs';
 function aligned(value) { return Math.ceil(value / 4) * 4; }
 export function readHeader(bytes) {
   if (bytes.length < 12 || bytes.subarray(0,4).toString('hex') !== '43444601') throw new Error('不是CDF-1文件');
@@ -25,3 +26,4 @@ export function readDataset(bytes) {
   return { ...header, attributes, variables, readVariable(variableName,start=0,count=undefined){const variable=variables.find(item=>item.name===variableName);if(!variable)throw new Error('变量不存在');const total=variable.dimensions.reduce((product,index)=>product*header.dimensions[index].size,1);count??=total-start;if(!Number.isInteger(start)||!Number.isInteger(count)||start<0||count<0||start+count>total)throw new Error('变量切片越界');return values(variable.type,count,variable.begin+start*widths[variable.type]);} };
 }
 export async function inspect(base,options={}){const response=await get(base,'/file?kind='+(options.kind??'contiguous'));const bytes=Buffer.from(await response.arrayBuffer());const dataset=readDataset(bytes);return {dimensions:dataset.dimensions,variables:dataset.variables,temperature:dataset.readVariable('temperature'),bytes:bytes.length};}
+export async function collect(base,options={}){const response=await get(base,'/file?kind='+(options.kind??'contiguous'));const bytes=Buffer.from(await response.arrayBuffer());const dataset=readDataset(bytes);const chunkSize=options.chunkSize===undefined?undefined:Number(options.chunkSize);return collectObservations(dataset,{chunkSize});}
